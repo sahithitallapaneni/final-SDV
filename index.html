@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alternative Fuel Vehicles by Fuel Type</title>
+    <title>Alternative Fuel Vehicles Dashboard</title>
     <script src="https://d3js.org/d3.v6.min.js"></script>
     <style>
         .bar {
@@ -12,77 +12,84 @@
         .axis text {
             font-size: 12px;
         }
-        .axis path,
-        .axis line {
+        .axis path, .axis line {
             fill: none;
             shape-rendering: crispEdges;
+        }
+        .pie-chart path {
+            stroke: white;
         }
     </style>
 </head>
 <body>
-    <h1>Alternative Fuel Vehicles by Fuel Type</h1>
-    <svg width="800" height="500"></svg>
+    <h1>Alternative Fuel Vehicles Dashboard</h1>
+
+    <h2>1. Bar Chart: Number of Vehicles by Fuel Type</h2>
+    <svg id="fuelChart" width="800" height="400"></svg>
+
+    <h2>2. Pie Chart: Distribution of Vehicles by Manufacturer</h2>
+    <svg id="manufacturerChart" width="500" height="500"></svg>
+
+    <h2>3. Horizontal Bar Chart: Vehicles by Transmission Type</h2>
+    <svg id="transmissionChart" width="800" height="400"></svg>
+
+    <h2>4. Scatter Plot: Number of Passengers vs. Power System</h2>
+    <svg id="scatterPlot" width="800" height="400"></svg>
 
     <script>
-        // Load the CSV file
         d3.csv("datasets/Alternative Fuel Vehicles US.csv").then(function(data) {
-            // Group data by Fuel type and count occurrences
-            const fuelTypeCounts = d3.rollup(
-                data,
-                v => v.length,
-                d => d.Fuel
-            );
+            // 1. Bar Chart: Number of Vehicles by Fuel Type
+            const fuelTypeCounts = d3.rollup(data, v => v.length, d => d.Fuel);
+            const fuelData = Array.from(fuelTypeCounts, ([fuel, count]) => ({ fuel, count }));
 
-            // Convert the Map to an Array for D3
-            const dataArray = Array.from(fuelTypeCounts, ([fuel, count]) => ({ fuel, count }));
+            const svgFuel = d3.select("#fuelChart"),
+                  margin = {top: 40, right: 20, bottom: 100, left: 60},
+                  width = +svgFuel.attr("width") - margin.left - margin.right,
+                  height = +svgFuel.attr("height") - margin.top - margin.bottom;
+            const g = svgFuel.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+            const x = d3.scaleBand().domain(fuelData.map(d => d.fuel)).range([0, width]).padding(0.1);
+            const y = d3.scaleLinear().domain([0, d3.max(fuelData, d => d.count)]).nice().range([height, 0]);
+            g.selectAll(".bar").data(fuelData).enter().append("rect").attr("class", "bar")
+             .attr("x", d => x(d.fuel)).attr("y", d => y(d.count)).attr("height", d => height - y(d.count))
+             .attr("width", x.bandwidth());
+            g.append("g").call(d3.axisLeft(y));
+            g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text")
+             .attr("transform", "rotate(-45)").style("text-anchor", "end");
 
-            // Set dimensions and margins for the chart
-            const width = 800, height = 500;
-            const margin = { top: 40, right: 20, bottom: 100, left: 60 };
+            // 2. Pie Chart: Distribution of Vehicles by Manufacturer
+            const manufacturerCounts = d3.rollup(data, v => v.length, d => d.Manufacturer);
+            const manufacturerData = Array.from(manufacturerCounts, ([manufacturer, count]) => ({ manufacturer, count }));
+            const svgManufacturer = d3.select("#manufacturerChart"),
+                  radius = Math.min(+svgManufacturer.attr("width"), +svgManufacturer.attr("height")) / 2;
+            const pie = d3.pie().value(d => d.count);
+            const arc = d3.arc().innerRadius(0).outerRadius(radius - 10);
+            const color = d3.scaleOrdinal(d3.schemeCategory10);
+            const pieG = svgManufacturer.append("g").attr("transform", `translate(${radius},${radius})`);
+            pieG.selectAll("path").data(pie(manufacturerData)).enter().append("path")
+                .attr("d", arc).attr("fill", d => color(d.data.manufacturer));
 
-            const svg = d3.select("svg")
-                .attr("width", width)
-                .attr("height", height);
+            // 3. Horizontal Bar Chart: Vehicles by Transmission Type
+            const transmissionCounts = d3.rollup(data, v => v.length, d => d["Transmission Types"]);
+            const transmissionData = Array.from(transmissionCounts, ([trans, count]) => ({ trans, count }));
+            const svgTransmission = d3.select("#transmissionChart");
+            const xTrans = d3.scaleLinear().domain([0, d3.max(transmissionData, d => d.count)]).range([0, width]);
+            const yTrans = d3.scaleBand().domain(transmissionData.map(d => d.trans)).range([0, height]).padding(0.1);
+            svgTransmission.selectAll(".bar").data(transmissionData).enter().append("rect")
+                .attr("class", "bar").attr("x", 0).attr("y", d => yTrans(d.trans))
+                .attr("width", d => xTrans(d.count)).attr("height", yTrans.bandwidth());
+            svgTransmission.append("g").call(d3.axisLeft(yTrans));
+            svgTransmission.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(xTrans));
 
-            // Create scales
-            const x = d3.scaleBand()
-                .domain(dataArray.map(d => d.fuel))
-                .range([margin.left, width - margin.right])
-                .padding(0.1);
-
-            const y = d3.scaleLinear()
-                .domain([0, d3.max(dataArray, d => d.count)])
-                .nice()
-                .range([height - margin.bottom, margin.top]);
-
-            // Append bars to the chart
-            svg.append("g")
-                .selectAll("rect")
-                .data(dataArray)
-                .join("rect")
-                .attr("class", "bar")
-                .attr("x", d => x(d.fuel))
-                .attr("y", d => y(d.count))
-                .attr("height", d => y(0) - y(d.count))
-                .attr("width", x.bandwidth());
-
-            // Add x-axis
-            svg.append("g")
-                .attr("transform", `translate(0,${height - margin.bottom})`)
-                .call(d3.axisBottom(x))
-                .selectAll("text")
-                .attr("transform", "rotate(-45)")
-                .style("text-anchor", "end");
-
-            // Add y-axis
-            svg.append("g")
-                .attr("transform", `translate(${margin.left},0)`)
-                .call(d3.axisLeft(y))
-                .append("text")
-                .attr("fill", "black")
-                .attr("x", -margin.left)
-                .attr("y", margin.top - 10)
-                .text("Number of Vehicles");
+            // 4. Scatter Plot: Number of Passengers vs. Power System
+            const svgScatter = d3.select("#scatterPlot");
+            const scatterMargin = {top: 40, right: 20, bottom: 40, left: 60};
+            const xScatter = d3.scaleLinear().domain(d3.extent(data, d => +d["Number of Passengers"])).nice().range([scatterMargin.left, width - scatterMargin.right]);
+            const yScatter = d3.scaleBand().domain(data.map(d => d["Heavy-Duty Power System"])).range([height, 0]).padding(0.1);
+            svgScatter.selectAll("circle").data(data).enter().append("circle")
+                .attr("cx", d => xScatter(+d["Number of Passengers"])).attr("cy", d => yScatter(d["Heavy-Duty Power System"]))
+                .attr("r", 4).attr("fill", "orange");
+            svgScatter.append("g").call(d3.axisLeft(yScatter));
+            svgScatter.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(xScatter));
         });
     </script>
 </body>
