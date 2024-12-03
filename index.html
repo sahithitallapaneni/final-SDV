@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alternative Fuel Vehicles by Fuel Type</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <style>
+        .bar {
+            fill: steelblue;
+        }
+        .axis text {
+            font-size: 12px;
+        }
+        .axis path,
+        .axis line {
+            fill: none;
+            shape-rendering: crispEdges;
+        }
+    </style>
+</head>
+<body>
+    <h1>Alternative Fuel Vehicles by Fuel Type</h1>
+    <svg width="800" height="500"></svg>
+
+    <script>
+        // Load the CSV file
+        d3.csv("datasets/Alternative Fuel Vehicles US.csv").then(function(data) {
+            // Group data by Fuel type and count occurrences
+            const fuelTypeCounts = d3.rollup(
+                data,
+                v => v.length,
+                d => d.Fuel
+            );
+
+            // Convert the Map to an Array for D3
+            const dataArray = Array.from(fuelTypeCounts, ([fuel, count]) => ({ fuel, count }));
+
+            // Set dimensions and margins for the chart
+            const width = 800, height = 500;
+            const margin = { top: 40, right: 20, bottom: 100, left: 60 };
+
+            const svg = d3.select("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // Create scales
+            const x = d3.scaleBand()
+                .domain(dataArray.map(d => d.fuel))
+                .range([margin.left, width - margin.right])
+                .padding(0.1);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(dataArray, d => d.count)])
+                .nice()
+                .range([height - margin.bottom, margin.top]);
+
+            // Append bars to the chart
+            svg.append("g")
+                .selectAll("rect")
+                .data(dataArray)
+                .join("rect")
+                .attr("class", "bar")
+                .attr("x", d => x(d.fuel))
+                .attr("y", d => y(d.count))
+                .attr("height", d => y(0) - y(d.count))
+                .attr("width", x.bandwidth());
+
+            // Add x-axis
+            svg.append("g")
+                .attr("transform", `translate(0,${height - margin.bottom})`)
+                .call(d3.axisBottom(x))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            // Add y-axis
+            svg.append("g")
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(d3.axisLeft(y))
+                .append("text")
+                .attr("fill", "black")
+                .attr("x", -margin.left)
+                .attr("y", margin.top - 10)
+                .text("Number of Vehicles");
+        });
+    </script>
+</body>
+</html>
